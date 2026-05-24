@@ -230,10 +230,6 @@ select option{background:var(--card);}
   <!-- DASHBOARD -->
   <div id="pan-dash" class="pan on">
     <div class="sgrid" id="dash-stats"></div>
-    <div class="card">
-      <h2>📅 Бугунги даvoмат — <span id="today-lbl" style="color:var(--mut);font-size:.76rem;font-weight:400;"></span></h2>
-      <div id="today-grid"></div>
-    </div>
     <div class="sec">Охирги ёзувлар</div>
     <div id="recent-list" class="ll"></div>
   </div>
@@ -718,20 +714,34 @@ async function saveDav(){
   const wid=document.getElementById('mo-wid').value;const date=document.getElementById('mo-date').value;
   const status=document.getElementById('mo-stat').value;
   const st=document.getElementById('mo-s').value;const en=document.getElementById('mo-e').value;
-  const w=W.find(x=>x.id===wid);
+  const w=W.find(x=>x.id===wid);if(!w)return;
   const p=calcPay(w,status==='kelmadi'?'':st,status==='kelmadi'?'':en);
   const clientId=document.getElementById('mo-dav-cli').value||'';
   const key=date+'_'+wid;
-  const body={worker_id:wid,date,start_time:status==='kelmadi'?'':st,end_time:status==='kelmadi'?'':en,
-    status,pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),penalty:Math.round(p.penalty),
-    client_id:clientId,note:document.getElementById('mo-note').value.trim(),from_worker:false};
-  if(D[key]){
-    await sb('PATCH','brigade_davomat',`worker_id=eq.${wid}&date=eq.${date}`,body);
-  } else {
-    body.id=genId();
-    await sb('POST','brigade_davomat','',body);
+  showToast('⏳ Сақланмоқда...');
+  try{
+    if(D[key]&&D[key].id){
+      // Existing entry - PATCH by id
+      await sb('PATCH','brigade_davomat',`id=eq.${D[key].id}`,{
+        start_time:status==='kelmadi'?'':st,end_time:status==='kelmadi'?'':en,
+        status,pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),
+        penalty:Math.round(p.penalty),client_id:clientId,
+        note:document.getElementById('mo-note').value.trim()
+      });
+    } else {
+      // New entry - POST
+      await sb('POST','brigade_davomat','',{
+        id:genId(),worker_id:wid,date,
+        start_time:status==='kelmadi'?'':st,end_time:status==='kelmadi'?'':en,
+        status,pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),
+        penalty:Math.round(p.penalty),client_id:clientId,
+        note:document.getElementById('mo-note').value.trim(),from_worker:false
+      });
+    }
+    closeModal('mo-dav');await syncAll();showToast('✅ Сақланди!');
+  }catch(e){
+    showToast('❌ Хато! Qayta urinib ko\'ring.');
   }
-  closeModal('mo-dav');await syncAll();showToast('✅ Сақланди!');
 }
 
 async function delDav(date,wid){
@@ -745,18 +755,25 @@ async function delDav(date,wid){
 async function quickDav(wid,date,status){
   const key=date+'_'+wid;const ex=D[key];
   if(ex&&ex.status===status){
-    await sb('DELETE','brigade_davomat',`worker_id=eq.${wid}&date=eq.${date}`);
+    await sb('DELETE','brigade_davomat',`id=eq.${ex.id}`);
     await syncAll();return;
   }
   const w=W.find(x=>x.id===wid);
   const aClient=C.find(c=>(c.assigned_workers||[]).includes(wid));
   const st=status==='keldi'?'08:00':'';const en=status==='keldi'?'19:00':'';
   const p=calcPay(w,st,en);
-  const body={id:genId(),worker_id:wid,date,start_time:st,end_time:en,status,
-    pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),penalty:Math.round(p.penalty),
-    client_id:aClient?aClient.id:'',note:'',from_worker:false};
-  if(ex){delete body.id;await sb('PATCH','brigade_davomat',`worker_id=eq.${wid}&date=eq.${date}`,body);}
-  else await sb('POST','brigade_davomat','',body);
+  if(ex&&ex.id){
+    await sb('PATCH','brigade_davomat',`id=eq.${ex.id}`,{
+      start_time:st,end_time:en,status,pay:Math.round(p.pay),
+      hours:parseFloat(p.hours.toFixed(2)),penalty:Math.round(p.penalty)
+    });
+  } else {
+    await sb('POST','brigade_davomat','',{
+      id:genId(),worker_id:wid,date,start_time:st,end_time:en,status,
+      pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),penalty:Math.round(p.penalty),
+      client_id:aClient?aClient.id:'',note:'',from_worker:false
+    });
+  }
   await syncAll();showToast(status==='keldi'?'✅ Keldi!':'❌ Kelmadi!');
 }
 
