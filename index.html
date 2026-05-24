@@ -1162,16 +1162,35 @@ function renderCPSched(){
   }).join('');
 }
 
+// Dollar izohidan ma'lumot ajratish: "100$ (kurs: 12700)" → {usd:100, rate:12700}
+function parseUsdNote(note){
+  if(!note)return null;
+  const m=note.match(/([0-9.]+)\$\s*\(kurs:\s*([0-9.]+)\)/);
+  if(m)return{usd:parseFloat(m[1]),rate:parseFloat(m[2])};
+  return null;
+}
+
 function renderCPPayList(){
   const cpays=CPAY.filter(p=>p.client_id===curClientId);
   const el=document.getElementById('cp-plist');
   const TL={avans:'💵 Аванс',toliq:'✅ Тўлиқ',qisman:'📦 Қисман'};
   if(!cpays.length){el.innerHTML='<div style="color:var(--mut);font-size:.8rem;text-align:center;padding:8px;">Тўловлар йўқ</div>';return;}
-  el.innerHTML=cpays.slice().reverse().map(p=>`<div class="ai">
-    <div style="flex:1;"><div style="font-weight:600;font-size:.85rem;">${fmt(p.amount)} сўм <span style="font-size:.68rem;color:var(--blu);">${TL[p.type]||''}</span></div>
-    <div style="font-size:.7rem;color:var(--mut);">${p.date||''}${p.note?' · '+p.note:''}</div></div>
-    <button class="bs bdl" onclick="delCPPay('${p.id}')">🗑️</button>
-  </div>`).join('');
+  el.innerHTML=cpays.slice().reverse().map(p=>{
+    const usdInfo=parseUsdNote(p.note);
+    const cleanNote=p.note?p.note.replace(/[0-9.]+\$\s*\(kurs:\s*[0-9.]+\)\s*·?\s*/,'').trim():'';
+    return `<div class="ai">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:.85rem;">
+          ${fmt(p.amount)} сўм
+          ${usdInfo?`<span style="color:var(--blu);font-size:.75rem;font-weight:600;"> = ${usdInfo.usd}$</span>`:''}
+          <span style="font-size:.68rem;color:var(--blu);font-weight:400;"> ${TL[p.type]||''}</span>
+        </div>
+        ${usdInfo?`<div style="font-size:.68rem;color:var(--mut);">Kurs: ${usdInfo.rate.toLocaleString()} сўм/$</div>`:''}
+        <div style="font-size:.7rem;color:var(--mut);">${p.date||''}${cleanNote?' · '+cleanNote:''}</div>
+      </div>
+      <button class="bs bdl" onclick="delCPPay('${p.id}')">🗑️</button>
+    </div>`;
+  }).join('');
 }
 
 function updCurrFields(){
@@ -1296,28 +1315,50 @@ function renderStat(){
   const tP=davEnt.reduce((s,e)=>s+(e.penalty||0),0);
   const tD=davEnt.filter(e=>e.status==='keldi'||e.status==='yarim').length;
   const tH=davEnt.reduce((s,e)=>s+(e.hours||0),0);
-  let income=0,contractSum=0,debt=0;
-  C.forEach(c=>{contractSum+=(c.total||0);const p=filterCPay(c).reduce((s,x)=>s+x.amount,0);income+=p;debt+=Math.max(0,(c.total||0)-CPAY.filter(x=>x.client_id===c.id).reduce((s,x)=>s+x.amount,0));});
+  let income=0,contractSum=0,debt=0,totalUsd=0;
+  C.forEach(c=>{
+    contractSum+=(c.total||0);
+    const cPays=filterCPay(c);
+    const p=cPays.reduce((s,x)=>s+x.amount,0);
+    income+=p;
+    // Count dollar payments
+    cPays.forEach(pay=>{const u=parseUsdNote(pay.note);if(u)totalUsd+=u.usd;});
+    debt+=Math.max(0,(c.total||0)-CPAY.filter(x=>x.client_id===c.id).reduce((s,x)=>s+x.amount,0));
+  });
   const foyda=income-wCost;
+  // Average rate from dollar payments
+  let avgRate=0,rateCount=0;
+  CPAY.forEach(p=>{const u=parseUsdNote(p.note);if(u){avgRate+=u.rate;rateCount++;}});
+  avgRate=rateCount?Math.round(avgRate/rateCount):0;
+
   document.getElementById('st-top').innerHTML=`
-    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(income)}</div><div class="l">💰 Тушган пул</div></div>
-    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(wCost)}</div><div class="l">👷 Маош</div></div>
-    <div class="sc"><div class="v" style="font-size:1rem;color:${foyda>=0?'var(--grn)':'var(--red)'};">${fmt(Math.abs(foyda))}</div><div class="l">${foyda>=0?'📈 Фойда':'📉 Зарар'}</div></div>
-    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(debt)}</div><div class="l">⏳ Қарз</div></div>
-    <div class="sc"><div class="v">${tD}</div><div class="l">📅 Иш кун</div></div>
-    <div class="sc"><div class="v">${tH.toFixed(0)}</div><div class="l">⏱ Соат</div></div>`;
-  const wPct=income>0?Math.min(100,(wCost/income*100).toFixed(1)):0;
-  const fPct=income>0?Math.max(0,(foyda/income*100).toFixed(1)):0;
+    <div class="sc"><div class="v" style="font-size:.95rem;">${fmt(income)}</div><div class="l">💰 Тушган (сўм)</div></div>
+    <div class="sc"><div class="v" style="font-size:.95rem;color:var(--blu);">${totalUsd.toLocaleString()} $</div><div class="l">💵 Тушган ($)</div></div>
+    <div class="sc"><div class="v" style="font-size:.95rem;">${fmt(wCost)}</div><div class="l">👷 Маош</div></div>
+    <div class="sc"><div class="v" style="font-size:.95rem;color:${foyda>=0?'var(--grn)':'var(--red)'};">${fmt(Math.abs(foyda))}</div><div class="l">${foyda>=0?'📈 Фойда':'📉 Зарар'}</div></div>
+    <div class="sc"><div class="v" style="font-size:.95rem;">${fmt(debt)}</div><div class="l">⏳ Қарз</div></div>
+    <div class="sc"><div class="v" style="font-size:.95rem;">${avgRate?fmt(avgRate)+' сўм':'—'}</div><div class="l">📊 Ўрт. кurs/$</div></div>`;
   document.getElementById('st-fin').innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:13px;margin-bottom:10px;">
     <div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--mut);margin-bottom:3px;"><span>Даромад / Харажат</span><span>${fmt(income)} сўм</span></div>
     <div class="bar"><div class="bar-fill" style="width:${wPct}%;background:var(--red);"></div></div>
     <div style="display:flex;gap:10px;margin-top:5px;font-size:.68rem;"><span style="color:var(--grn);">■ Фойда: ${fmt(Math.max(0,foyda))} (${fPct}%)</span><span style="color:var(--red);">■ Маош: ${fmt(wCost)} (${wPct}%)</span></div></div>
-    ${[['💰 Тушган пул',fmt(income)+' сўм','var(--grn)'],['📋 Шартнома',fmt(contractSum)+' сўм','var(--txt)'],['⏳ Клиент қарзи',fmt(debt)+' сўм','var(--red)'],['👷 Маош харажати',fmt(wCost)+' сўм','var(--acc)'],['⚡ Жарималар',fmt(tP)+' сўм','var(--mut)'],[foyda>=0?'📈 Соф фойда':'📉 Зарар',fmt(Math.abs(foyda))+' сўм',foyda>=0?'var(--grn)':'var(--red)']].map(([l,v,clr])=>
+    ${[
+      ['💰 Тушган пул (сўм)',fmt(income)+' сўм','var(--grn)'],
+      ['💵 Тушган пул ($)',totalUsd?totalUsd.toLocaleString()+' $':'0 $','var(--blu)'],
+      ['📊 Ўртача курс',avgRate?fmt(avgRate)+' сўм/$':'—','var(--mut)'],
+      ['📋 Шартнома',fmt(contractSum)+' сўм','var(--txt)'],
+      ['⏳ Клиент қарзи',fmt(debt)+' сўм','var(--red)'],
+      ['👷 Маош харажати',fmt(wCost)+' сўм','var(--acc)'],
+      ['⚡ Жарималар',fmt(tP)+' сўм','var(--mut)'],
+      [foyda>=0?'📈 Соф фойда':'📉 Зарар',fmt(Math.abs(foyda))+' сўм',foyda>=0?'var(--grn)':'var(--red)']
+    ].map(([l,v,clr])=>
       `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor);"><span style="font-size:.78rem;color:var(--mut);">${l}</span><span style="font-size:.8rem;font-weight:700;color:${clr};">${v}</span></div>`).join('')}
   </div>`;
   document.getElementById('st-proj').innerHTML=C.map(c=>{
     const paid=CPAY.filter(p=>p.client_id===c.id).reduce((s,p)=>s+p.amount,0);
     const fP=filterCPay(c).reduce((s,p)=>s+p.amount,0);
+    // Dollar payments for this client
+    const cUsd=filterCPay(c).reduce((s,p)=>{const u=parseUsdNote(p.note);return s+(u?u.usd:0);},0);
     const cD=Math.max(0,(c.total||0)-paid);
     const cW=davEnt.filter(e=>e.client_id===c.id&&e.status!=='kelmadi').reduce((s,e)=>s+(e.pay||0),0);
     const pr=fP-cW;const pct=c.total>0?Math.min(100,Math.round(paid/c.total*100)):0;
@@ -1330,7 +1371,7 @@ function renderStat(){
       <div style="margin-bottom:7px;"><div class="bar"><div class="bar-fill" style="width:${pct}%;background:${pct>=100?'var(--grn)':'var(--acc)'};"></div></div></div>
       <div class="mgrid">
         <div class="mc"><div class="v" style="font-size:.8rem;">${fmt(c.total)}</div><div class="l">Шартнома</div></div>
-        <div class="mc"><div class="v" style="font-size:.8rem;color:var(--grn);">${fmt(paid)}</div><div class="l">Тўланди</div></div>
+        <div class="mc"><div class="v" style="font-size:.8rem;color:var(--grn);">${fmt(paid)}<br>${cUsd?'<span style="font-size:.65rem;color:var(--blu);">'+cUsd+'$</span>':''}</div><div class="l">Тўланди</div></div>
         <div class="mc"><div class="v" style="font-size:.8rem;color:${cD>0?'var(--red)':'var(--grn)'};">${fmt(cD)}</div><div class="l">${cD>0?'Қарз':'Тўлиқ'}</div></div>
         <div class="mc"><div class="v" style="font-size:.8rem;color:var(--acc);">${fmt(cW)}</div><div class="l">Маош</div></div>
         <div class="mc" style="grid-column:span 2;background:rgba(${pr>=0?'46,204,113':'231,76,60'},.1);">
