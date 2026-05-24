@@ -137,7 +137,12 @@ function ini(n){return(n||'?').split(' ').map(x=>x[0]||'').join('').slice(0,2).t
 function today(){return new Date().toISOString().slice(0,10);}
 function thisMonth(){return new Date().toISOString().slice(0,7);}
 function t2m(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return h*60+(m||0);}
-function nowTime(){return new Date().toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});}
+function nowTime(){
+  const now=new Date();
+  const h=now.getHours().toString().padStart(2,'0');
+  const m=now.getMinutes().toString().padStart(2,'0');
+  return h+':'+m;
+}
 
 function hrRate(w){
   const r=w.rate||0,t=w.stavka_type||'daily';
