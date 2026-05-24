@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Davomat">
+<meta name="theme-color" content="#f5a623">
+<title>Davomat</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--sur:#1a1d27;--card:#22263a;--bor:#2e3451;--acc:#f5a623;--grn:#2ecc71;--red:#e74c3c;--txt:#e8eaf0;--mut:#8b91a8;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--txt);font-family:'Source Sans 3',sans-serif;min-height:100vh;}
+header{background:linear-gradient(135deg,#1a1d27,#0f1117);border-bottom:2px solid var(--acc);padding:14px 16px;text-align:center;}
+header h1{font-family:'Oswald',sans-serif;font-size:1.3rem;font-weight:700;color:var(--acc);}
+header p{font-size:.72rem;color:var(--mut);margin-top:2px;}
+.con{max-width:480px;margin:0 auto;padding:16px 14px;padding-bottom:40px;}
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:16px;margin-bottom:14px;}
+.card h2{font-family:'Oswald',sans-serif;font-size:.95rem;color:var(--acc);margin-bottom:12px;}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-family:'Oswald',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;margin-top:4px;}
+.bgrn{background:var(--grn);color:#0f1117;}
+.bacc{background:var(--acc);color:#0f1117;}
+.bgr{background:var(--bor);color:var(--mut);}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--grn);color:#0f1117;font-family:'Oswald',sans-serif;font-weight:700;padding:10px 22px;border-radius:30px;z-index:999;transition:transform .3s;pointer-events:none;font-size:.9rem;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+/* SELECT */
+.wbtn{background:var(--sur);border:1.5px solid var(--bor);border-radius:12px;padding:13px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;width:100%;}
+.wbtn:active{border-color:var(--acc);}
+.av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#e8502a);display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:1rem;font-weight:700;color:#0f1117;flex-shrink:0;}
+/* STATUS */
+.status-box{text-align:center;padding:20px;}
+.big-icon{font-size:3rem;margin-bottom:8px;}
+.status-title{font-family:'Oswald',sans-serif;font-size:1.1rem;color:var(--acc);}
+.time-chip{display:inline-block;background:rgba(46,204,113,.15);color:var(--grn);border-radius:8px;padding:5px 14px;font-family:'Oswald',sans-serif;font-size:.88rem;margin:4px;}
+.pay-big{font-family:'Oswald',sans-serif;font-size:1.8rem;font-weight:700;color:var(--grn);margin-top:10px;}
+.pay-sub{font-size:.72rem;color:var(--mut);margin-top:3px;}
+/* HISTORY */
+.hrow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bor);}
+.hrow:last-child{border-bottom:none;}
+.hdate{font-family:'Oswald',sans-serif;font-size:.8rem;color:var(--acc);min-width:55px;}
+/* MONEY SUMMARY */
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.mc{background:var(--card);border-radius:8px;padding:8px;text-align:center;}
+.mc .v{font-family:'Oswald',sans-serif;font-size:.9rem;}
+.mc .l{font-size:.62rem;color:var(--mut);margin-top:2px;}
+/* CLOCK */
+.clock{font-family:'Oswald',sans-serif;font-size:2.2rem;font-weight:700;color:var(--acc);text-align:center;}
+.cdate{font-size:.78rem;color:var(--mut);text-align:center;margin-top:2px;margin-bottom:16px;}
+.loading{text-align:center;padding:30px;color:var(--mut);}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏗️ DAVOMAT</h1>
+  <p id="hdr-name">Ремонт бригадаси</p>
+</header>
+<div class="toast" id="toast"></div>
+<div class="con">
+
+  <!-- SELECT -->
+  <div id="scr-sel" style="display:none;">
+    <div class="card">
+      <h2>👋 Ismingizni tanlang</h2>
+      <div id="wlist"></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="scr-main" style="display:none;">
+    <div class="clock" id="clock"></div>
+    <div class="cdate" id="cdate"></div>
+
+    <!-- Today status -->
+    <div class="card">
+      <div id="status-box" class="status-box"></div>
+      <div id="action-box"></div>
+    </div>
+
+    <!-- Maosh hisob (joriy oy) -->
+    <div class="card">
+      <h2>💰 Joriy oy hisobi</h2>
+      <div id="money-summary" class="mgrid"></div>
+      <div id="advance-list" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Oxirgi 10 kun -->
+    <div class="card">
+      <h2>📋 Oxirgi yozuvlar</h2>
+      <div id="hist-list"></div>
+    </div>
+
+    <button class="btn bgr" onclick="logout()" style="margin-top:4px;">← Ismni o'zgartirish</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="scr-load" class="loading">⏳ Yuklanmoqda...</div>
+
+</div>
+
+<script>
+const SB='https://keentgdovcewjdbcujti.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZW50Z2RvdmNld2pkYmN1anRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1NTkxMTUsImV4cCI6MjA5NTEzNTExNX0.BNoLQg91mHTYKttDSA1J0LRpWgpbH7On_Mv8b1t6Lss';
+const MN=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+const DN=['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'];
+const WH=10,LS=780,LE=840;
+
+let worker=null,todayEnt=null;
+
+async function api(method,table,query,body){
+  try{
+    const r=await fetch(`${SB}/rest/v1/${table}${query?'?'+query:''}`,{
+      method,
+      headers:{
+        'apikey':SK,'Authorization':'Bearer '+SK,
+        'Content-Type':'application/json',
+        'Prefer':method==='POST'?'return=representation':''
+      },
+      body:body?JSON.stringify(body):undefined
+    });
+    const t=await r.text();
+    return t?JSON.parse(t):null;
+  }catch(e){return null;}
+}
+
+function fmt(n){return Math.round(Number(n||0)).toLocaleString('uz-UZ');}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function ini(n){return(n||'?').split(' ').map(x=>x[0]||'').join('').slice(0,2).toUpperCase();}
+function today(){return new Date().toISOString().slice(0,10);}
+function thisMonth(){return new Date().toISOString().slice(0,7);}
+function t2m(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return h*60+(m||0);}
+function nowTime(){return new Date().toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});}
+
+function hrRate(w){
+  const r=w.rate||0,t=w.stavka_type||'daily';
+  if(t==='hourly')return r;
+  if(t==='daily')return r/WH;
+  if(t==='weekly')return r/(5*WH);
+  return r/(22*WH);
+}
+function calcPay(w,s,e){
+  if(!s||!e)return{pay:0,hours:0,penalty:0,hr:0};
+  let sm=t2m(s),em=t2m(e);if(em<=sm)em+=1440;
+  let tot=em-sm;
+  const os=Math.max(sm,LS),oe=Math.min(em,LE);
+  if(oe>os)tot-=(oe-os);
+  const hours=Math.max(0,tot/60);
+  const hr=hrRate(w);const pay=hours*hr;
+  return{pay,hours,penalty:Math.max(0,hr*WH-pay),hr};
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function show(id){
+  ['scr-sel','scr-main','scr-load'].forEach(x=>{
+    document.getElementById(x).style.display=x===id?'block':'none';
+  });
+}
+
+// Clock
+function updateClock(){
+  const now=new Date();
+  const ce=document.getElementById('clock');const de=document.getElementById('cdate');
+  if(ce)ce.textContent=now.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  if(de)de.textContent=`${now.getDate()} ${MN[now.getMonth()]} ${now.getFullYear()} — ${DN[now.getDay()]}`;
+}
+setInterval(updateClock,1000);updateClock();
+
+// Init
+window.onload=async()=>{
+  const sid=localStorage.getItem('w_id');
+  if(sid){
+    show('scr-load');
+    const ws=await api('GET','brigade_workers',`id=eq.${sid}`);
+    if(ws&&ws.length){worker=ws[0];await showMain();return;}
+    localStorage.removeItem('w_id');
+  }
+  await showSel();
+};
+
+async function showSel(){
+  show('scr-sel');
+  const el=document.getElementById('wlist');
+  el.innerHTML='<div style="color:var(--mut);text-align:center;padding:12px;">Yuklanmoqda...</div>';
+  const ws=await api('GET','brigade_workers','order=name');
+  if(!ws||!ws.length){
+    el.innerHTML='<div style="color:var(--mut);text-align:center;padding:16px;">Hali ishchilar yo\'q.<br>Brigadadir ilovasi orqali qo\'shsin.</div>';
+    return;
+  }
+  el.innerHTML=ws.map(w=>`
+    <button class="wbtn" onclick="selectWorker('${w.id}')">
+      <div class="av">${ini(w.name)}</div>
+      <div style="text-align:left;">
+        <div style="font-weight:700;font-size:.95rem;">${w.name}</div>
+        <div style="font-size:.7rem;color:var(--mut);">${w.job||''}</div>
+      </div>
+    </button>`).join('');
+}
+
+async function selectWorker(wid){
+  show('scr-load');
+  const ws=await api('GET','brigade_workers',`id=eq.${wid}`);
+  if(ws&&ws.length){
+    worker=ws[0];localStorage.setItem('w_id',wid);await showMain();
+  } else showSel();
+}
+
+function logout(){localStorage.removeItem('w_id');worker=null;todayEnt=null;showSel();}
+
+async function showMain(){
+  show('scr-main');
+  document.getElementById('hdr-name').textContent=worker.name;
+  await loadToday();
+  await loadMoney();
+  await loadHistory();
+}
+
+async function loadToday(){
+  const t=today();
+  const es=await api('GET','brigade_davomat',`worker_id=eq.${worker.id}&date=eq.${t}`);
+  todayEnt=es&&es.length?es[0]:null;
+  renderStatus();
+}
+
+function renderStatus(){
+  const sb=document.getElementById('status-box');
+  const ab=document.getElementById('action-box');
+  const nt=nowTime();
+
+  if(!todayEnt){
+    sb.innerHTML=`<div class="big-icon">👋</div>
+      <div class="status-title">Hali kelmagan</div>
+      <div style="font-size:.78rem;color:var(--mut);margin-top:4px;">Kelish vaqtini belgilang</div>`;
+    ab.innerHTML=`<button class="btn bgrn" onclick="checkIn()">✅ KELDIM — ${nt}</button>`;
+
+  } else if(todayEnt.start_time && !todayEnt.end_time){
+    sb.innerHTML=`<div class="big-icon">🔨</div>
+      <div class="status-title">Ishda!</div>
+      <div style="margin-top:8px;"><span class="time-chip">Keldi: ${todayEnt.start_time}</span></div>`;
+    ab.innerHTML=`<button class="btn bacc" onclick="checkOut()">🚪 KETDIM — ${nt}</button>`;
+
+  } else if(todayEnt.start_time && todayEnt.end_time){
+    const p=calcPay(worker,todayEnt.start_time,todayEnt.end_time);
+    const realPay=todayEnt.pay||p.pay;
+    const realHours=todayEnt.hours||p.hours;
+    const realPenalty=todayEnt.penalty||p.penalty;
+    sb.innerHTML=`<div class="big-icon">✅</div>
+      <div class="status-title">Bugun tugadi!</div>
+      <div style="margin-top:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+        <span class="time-chip">Keldi: ${todayEnt.start_time}</span>
+        <span style="background:rgba(245,166,35,.15);color:var(--acc);border-radius:8px;padding:5px 14px;font-family:'Oswald',sans-serif;font-size:.88rem;">Ketdi: ${todayEnt.end_time}</span>
+      </div>
+      <div class="pay-big">${fmt(realPay)} so'm</div>
+      <div class="pay-sub">${realHours.toFixed(1)} soat × ${fmt(p.hr)} so'm/soat</div>
+      ${realPenalty>0?`<div style="font-size:.72rem;color:var(--red);margin-top:3px;">Jarima: −${fmt(realPenalty)} so'm (${(WH-realHours).toFixed(1)} soat kam)</div>`:''}`;
+    ab.innerHTML=`<div style="background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.2);border-radius:10px;padding:11px;text-align:center;font-size:.82rem;color:var(--mut);">Bugungi davomat yakunlandi ✅</div>`;
+  }
+}
+
+async function checkIn(){
+  const t=nowTime();const td=today();
+  const body={id:genId(),worker_id:worker.id,date:td,start_time:t,end_time:null,
+    status:'keldi',pay:0,hours:0,penalty:0,rate:worker.rate||0,
+    stavka_type:worker.stavka_type||'daily',from_worker:true,client_id:''};
+  const res=await api('POST','brigade_davomat','',body);
+  if(res&&res.length){todayEnt=res[0];renderStatus();await loadHistory();showToast('✅ Kelish vaqti saqlandi: '+t);}
+  else showToast('❌ Xatolik! Internetni tekshiring.');
+}
+
+async function checkOut(){
+  const t=nowTime();
+  const p=calcPay(worker,todayEnt.start_time,t);
+  await api('PATCH','brigade_davomat',`id=eq.${todayEnt.id}`,{
+    end_time:t,pay:Math.round(p.pay),hours:parseFloat(p.hours.toFixed(2)),penalty:Math.round(p.penalty)
+  });
+  todayEnt={...todayEnt,end_time:t,pay:p.pay,hours:p.hours,penalty:p.penalty};
+  renderStatus();await loadMoney();await loadHistory();showToast('✅ Ketish vaqti saqlandi: '+t);
+}
+
+async function loadMoney(){
+  const month=thisMonth();
+  // Davomat entries this month
+  const es=await api('GET','brigade_davomat',`worker_id=eq.${worker.id}&date=gte.${month}-01&order=date.desc`);
+  // Advances
+  const advs=await api('GET','brigade_advances',`worker_id=eq.${worker.id}&order=created_at.desc`);
+
+  const entries=es||[];const advances=advs||[];
+
+  const totalPay=entries.filter(e=>e.status!=='kelmadi').reduce((s,e)=>s+(e.pay||0),0);
+  const totalDays=entries.filter(e=>e.status==='keldi'||e.status==='yarim').length;
+  const totalHours=entries.reduce((s,e)=>s+(e.hours||0),0);
+  const totalAdv=advances.reduce((s,a)=>s+a.amount,0);
+  // Only month advances
+  const monthAdv=advances.filter(a=>a.date&&a.date.startsWith(month)).reduce((s,a)=>s+a.amount,0);
+  const toGet=Math.max(0,totalPay-totalAdv);
+
+  document.getElementById('money-summary').innerHTML=`
+    <div class="mc"><div class="v">${totalDays}</div><div class="l">Iш кун</div></div>
+    <div class="mc"><div class="v">${totalHours.toFixed(1)}</div><div class="l">Соат</div></div>
+    <div class="mc"><div class="v" style="color:var(--grn);">${fmt(totalPay)}</div><div class="l">Маош</div></div>
+    <div class="mc"><div class="v" style="color:var(--acc);">${fmt(totalAdv)}</div><div class="l">Аванс олди</div></div>
+    <div class="mc" style="grid-column:span 2;background:rgba(46,204,113,.1);">
+      <div class="v" style="color:var(--grn);font-size:1rem;">${fmt(toGet)}</div>
+      <div class="l">ОЛИШИ КЕРАК</div>
+    </div>`;
+
+  // Advances list
+  const advEl=document.getElementById('advance-list');
+  if(!advances.length){advEl.innerHTML='';return;}
+  advEl.innerHTML=`<div style="font-size:.72rem;color:var(--mut);margin-bottom:6px;font-family:'Oswald',sans-serif;letter-spacing:.5px;">АВАНС ТАРИХИ</div>`+
+    advances.slice(0,5).map(a=>`
+      <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor);font-size:.78rem;">
+        <span style="color:var(--mut);">${a.date||''} ${a.note?'· '+a.note:''}</span>
+        <span style="color:var(--acc);font-weight:600;">${fmt(a.amount)} so'm</span>
+      </div>`).join('');
+}
+
+async function loadHistory(){
+  const el=document.getElementById('hist-list');
+  const es=await api('GET','brigade_davomat',`worker_id=eq.${worker.id}&order=date.desc&limit=14`);
+  if(!es||!es.length){el.innerHTML='<div style="color:var(--mut);font-size:.8rem;text-align:center;padding:8px;">Hali yozuv yo\'q</div>';return;}
+  el.innerHTML=es.map(e=>{
+    const d=new Date(e.date);const ds=`${d.getDate()} ${MN[d.getMonth()]}`;
+    const icon=e.status==='kelmadi'?'❌':e.end_time?'✅':'🔨';
+    const ts=e.start_time?(e.end_time?e.start_time+'–'+e.end_time:e.start_time+' →'):'';
+    return `<div class="hrow">
+      <div class="hdate">${ds}</div>
+      <div style="flex:1;">
+        <div style="font-size:.82rem;">${icon} ${ts}</div>
+        <div style="font-size:.68rem;color:var(--mut);">${e.hours?e.hours.toFixed(1)+' soat':''}</div>
+      </div>
+      <div style="font-family:'Oswald',sans-serif;font-size:.85rem;color:${e.pay?'var(--grn)':'var(--mut)'};">${e.pay?fmt(e.pay)+' so\'m':''}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
