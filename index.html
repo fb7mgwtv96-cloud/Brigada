@@ -569,11 +569,11 @@ async function addWorker(){
   const w={id:genId(),name,phone:document.getElementById('w-phone').value.trim(),
     job:document.getElementById('w-job').value.trim(),stavka_type:document.getElementById('w-stype').value,
     rate:parseInt(document.getElementById('w-rate').value)||0};
+  showToast('⏳ Сақланмоқда...');
   const res=await sb('POST','brigade_workers','',w);
-  if(res){['w-name','w-phone','w-job','w-rate'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('w-hint').value='';
-    await syncAll();showToast('✅ Ишчи қўшилди!');}
-  else showToast('❌ Xatolik!');
+  ['w-name','w-phone','w-job','w-rate'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('w-hint').value='';
+  await syncAll();showToast('✅ Ишчи қўшилди!');
 }
 
 function openEditWorker(id){
@@ -1001,7 +1001,7 @@ async function addClient(){
     address:document.getElementById('c-addr').value.trim(),location:document.getElementById('c-loc').value.trim(),
     lat:parseFloat(document.getElementById('c-lat').value)||null,lon:parseFloat(document.getElementById('c-lon').value)||null,
     status:document.getElementById('c-stat').value,total:parseInt(document.getElementById('c-total').value)||0,
-    start_date:document.getElementById('c-start').value||null,desc:document.getElementById('c-desc').value.trim(),
+    start_date:document.getElementById('c-start').value||null,description:document.getElementById('c-desc').value.trim(),
     assigned_workers:JSON.stringify([])};
   await sb('POST','brigade_clients','',client);
   if(adv>0){await sb('POST','brigade_client_payments','',{id:genId(),client_id:cid,amount:adv,type:'avans',date:document.getElementById('c-start').value||tDay(),note:'Аванс'});}
@@ -1018,10 +1018,282 @@ function openEditClient(id){
   document.getElementById('ec-loc').value=c.location||'';document.getElementById('ec-stat').value=c.status||'new';
   document.getElementById('ec-lat').value=c.lat||'';document.getElementById('ec-lon').value=c.lon||'';
   document.getElementById('ec-total').value=c.total||'';document.getElementById('ec-start').value=c.start_date||'';
-  document.getElementById('ec-desc').value=c.desc||'';
+  document.getElementById('ec-desc').value=c.description||'';
   document.getElementById('mo-cli').classList.remove('hid');
 }
 function editCurClient(){if(curClientId)openEditClient(curClientId);}
 
 async function saveClient(){
-  const 
+  const id=document.getElementById('ec-id').value;
+  const body={name:document.getElementById('ec-name').value.trim(),phone:document.getElementById('ec-phone').value.trim(),
+    address:document.getElementById('ec-addr').value.trim(),location:document.getElementById('ec-loc').value.trim(),
+    status:document.getElementById('ec-stat').value,total:parseInt(document.getElementById('ec-total').value)||0,
+    lat:parseFloat(document.getElementById('ec-lat').value)||null,lon:parseFloat(document.getElementById('ec-lon').value)||null,
+    start_date:document.getElementById('ec-start').value||null,description:document.getElementById('ec-desc').value.trim()};
+  await sb('PATCH','brigade_clients',`id=eq.${id}`,body);
+  closeModal('mo-cli');await syncAll();showToast('✅ Сақланди!');
+}
+
+async function delClient(id){
+  const c=C.find(x=>x.id===id);
+  showConf('Клиентни ўчириш',`"${c.name}" ўчирилади.`,async()=>{
+    await sb('DELETE','brigade_client_payments',`client_id=eq.${id}`);
+    await sb('DELETE','brigade_assignments',`client_id=eq.${id}`);
+    await sb('DELETE','brigade_clients',`id=eq.${id}`);
+    await syncAll();showToast('✅ Ўчирилди!');
+  });
+}
+
+function renderClients(){
+  const sf=document.getElementById('c-filter').value;
+  let clients=[...C];if(sf)clients=clients.filter(c=>c.status===sf);
+  const el=document.getElementById('cli-list');
+  if(!clients.length){el.innerHTML='<div class="emp"><div class="ic">🏠</div>Клиентлар йўқ</div>';return;}
+  el.innerHTML=clients.map(c=>{
+    const cpays=CPAY.filter(p=>p.client_id===c.id);
+    const paid=cpays.reduce((s,p)=>s+p.amount,0);const debt=Math.max(0,(c.total||0)-paid);
+    const aw=c.assigned_workers||[];const wTags=aw.map(wid=>{const w=W.find(x=>x.id===wid);return w?`<span class="tag tg">${w.name}</span>`:''}).join('');
+    return `<div class="cc">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div class="av b" style="width:30px;height:30px;font-size:.75rem;">${ini(c.name)}</div>
+        <div style="flex:1;font-weight:700;font-size:.87rem;">${c.name}</div>
+        <span class="sbg ${SCLS[c.status]||'sn'}">${SLBL[c.status]||'Янги'}</span>
+      </div>
+      ${c.phone||c.address?`<div style="font-size:.68rem;color:var(--mut);margin-bottom:4px;">${c.phone?'📞 '+c.phone:''}${c.phone&&c.address?' · ':''}${c.address?'📍 '+c.address:''}</div>`:''}
+      ${navBtns(c.lat,c.lon,c.location)}
+      <div class="mgrid" style="margin-top:8px;margin-bottom:8px;">
+        <div class="mc"><div class="v">${fmt(c.total)}</div><div class="l">Жами нарх</div></div>
+        <div class="mc"><div class="v" style="color:var(--grn);">${fmt(paid)}</div><div class="l">Тўланди</div></div>
+        <div class="mc"><div class="v" style="color:${debt>0?'var(--red)':'var(--grn)'};">${fmt(debt)}</div><div class="l">${debt>0?'Қарз':'Тўлиқ'}</div></div>
+      </div>
+      ${wTags?`<div style="margin-bottom:8px;">${wTags}</div>`:''}
+      <button class="btn bb" style="padding:8px;font-size:.8rem;" onclick="openCPg('${c.id}')">📂 КЛИЕНТ САҲИФАСИ</button>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="bs be" onclick="openEditClient('${c.id}')">✏️ Таҳрир</button>
+        <button class="bs bdl" onclick="delClient('${c.id}')">🗑️ Ўчириш</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCPg(cid){
+  curClientId=cid;const c=C.find(x=>x.id===cid);if(!c)return;
+  document.getElementById('cp-ttl').textContent=c.name;
+  document.getElementById('cp-sub').textContent=(c.address||'')+(c.phone?' · '+c.phone:'');
+  document.getElementById('cp-nav').innerHTML=navBtns(c.lat,c.lon,c.location);
+  document.getElementById('cp-desc').textContent=c.description||'';
+  document.getElementById('cp-smon').value=tMonth();
+  document.getElementById('cp-pdate').value=tDay();
+  renderCPMoney();renderCPAssign();renderCPSched();renderCPPayList();
+  document.getElementById('cpg').classList.add('op');document.body.style.overflow='hidden';
+}
+function closeCPg(){document.getElementById('cpg').classList.remove('op');document.body.style.overflow='';curClientId=null;}
+
+function renderCPMoney(){
+  const c=C.find(x=>x.id===curClientId);if(!c)return;
+  const paid=CPAY.filter(p=>p.client_id===c.id).reduce((s,p)=>s+p.amount,0);
+  const debt=Math.max(0,(c.total||0)-paid);
+  const html=`<div class="mc"><div class="v">${fmt(c.total)}</div><div class="l">Жами нарх</div></div>
+    <div class="mc"><div class="v" style="color:var(--grn);">${fmt(paid)}</div><div class="l">Тўланди</div></div>
+    <div class="mc"><div class="v" style="color:${debt>0?'var(--red)':'var(--grn)'};">${fmt(debt)}</div><div class="l">${debt>0?'Қарз':'Тўлиқ'}</div></div>`;
+  document.getElementById('cp-money').innerHTML=html;
+  document.getElementById('cp-pay-sum').innerHTML=html;
+}
+
+function renderCPAssign(){
+  const c=C.find(x=>x.id===curClientId);if(!c)return;
+  const aw=c.assigned_workers||[];
+  const el=document.getElementById('cp-assign');
+  if(!W.length){el.innerHTML='<div class="emp" style="padding:12px;"><div class="ic">👷</div>Ишчилар йўқ</div>';return;}
+  el.innerHTML=W.map(w=>`<div class="ait ${aw.includes(w.id)?'sel':''}" onclick="toggleAssign('${c.id}','${w.id}')">
+    <div class="av" style="width:30px;height:30px;font-size:.75rem;flex-shrink:0;">${ini(w.name)}</div>
+    <div style="flex:1;"><div style="font-weight:600;font-size:.82rem;">${w.name}</div></div>
+    <div>${aw.includes(w.id)?'✅':'⭕'}</div>
+  </div>`).join('');
+}
+
+async function toggleAssign(cid,wid){
+  const c=C.find(x=>x.id===cid);if(!c)return;
+  const aw=c.assigned_workers||[];
+  const idx=aw.indexOf(wid);
+  if(idx>=0)aw.splice(idx,1);else aw.push(wid);
+  await sb('PATCH','brigade_clients',`id=eq.${cid}`,{assigned_workers:JSON.stringify(aw)});
+  await syncAll();renderCPAssign();
+}
+
+function renderCPSched(){
+  const c=C.find(x=>x.id===curClientId);if(!c)return;
+  const month=document.getElementById('cp-smon').value||tMonth();
+  const el=document.getElementById('cp-sched');
+  const aw=c.assigned_workers||[];
+  if(!aw.length){el.innerHTML='<div class="emp" style="padding:12px;">Ишчи тайинланмаган</div>';return;}
+  const[yr,mo]=month.split('-');const days=dimM(month);
+  el.innerHTML=aw.map(wid=>{
+    const w=W.find(x=>x.id===wid);if(!w)return '';
+    let tD=0,tH=0,tP=0;const cells=[];
+    for(let d=1;d<=days;d++){
+      const date=`${yr}-${mo}-${d.toString().padStart(2,'0')}`;
+      const ent=D[date+'_'+wid];
+      const atC=ent&&(ent.client_id===c.id||(!ent.client_id&&aw.length===1));
+      if(atC&&ent.status!=='kelmadi'){tD++;tH+=(ent.hours||0);tP+=(ent.pay||0);}
+      cells.push({d,date,ent:atC?ent:null});
+    }
+    return `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--bor);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="av" style="width:28px;height:28px;font-size:.7rem;">${ini(w.name)}</div>
+        <div style="flex:1;"><div style="font-weight:600;font-size:.83rem;">${w.name}</div>
+          <div style="font-size:.67rem;color:var(--mut);">${tD} кун · ${tH.toFixed(1)} соат · ${fmt(tP)} сўм</div></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${cells.map(({d,date,ent})=>{if(!ent)return '';
+          const icon=ent.status==='keldi'?'✅':'⚡';
+          return `<div style="background:var(--card);border:1px solid var(--bor);border-radius:6px;padding:3px 6px;text-align:center;">
+            <div style="font-size:.6rem;color:var(--mut);">${d}</div>
+            <div style="font-size:.73rem;">${icon}</div>
+            <div style="font-size:.58rem;color:var(--grn);">${fmt(ent.pay)}</div>
+          </div>`;}).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCPPayList(){
+  const cpays=CPAY.filter(p=>p.client_id===curClientId);
+  const el=document.getElementById('cp-plist');
+  const TL={avans:'💵 Аванс',toliq:'✅ Тўлиқ',qisman:'📦 Қисман'};
+  if(!cpays.length){el.innerHTML='<div style="color:var(--mut);font-size:.8rem;text-align:center;padding:8px;">Тўловлар йўқ</div>';return;}
+  el.innerHTML=cpays.slice().reverse().map(p=>`<div class="ai">
+    <div style="flex:1;"><div style="font-weight:600;font-size:.85rem;">${fmt(p.amount)} сўм <span style="font-size:.68rem;color:var(--blu);">${TL[p.type]||''}</span></div>
+    <div style="font-size:.7rem;color:var(--mut);">${p.date||''}${p.note?' · '+p.note:''}</div></div>
+    <button class="bs bdl" onclick="delCPPay('${p.id}')">🗑️</button>
+  </div>`).join('');
+}
+
+async function addCPPay(){
+  const amt=parseInt(document.getElementById('cp-pamt').value)||0;
+  if(!amt){showToast('❌ Суммани киритинг!');return;}
+  await sb('POST','brigade_client_payments','',{id:genId(),client_id:curClientId,amount:amt,
+    type:document.getElementById('cp-ptype').value,date:document.getElementById('cp-pdate').value,
+    note:document.getElementById('cp-pnote').value.trim()});
+  document.getElementById('cp-pamt').value='';document.getElementById('cp-pnote').value='';
+  await syncAll();renderCPPayList();renderCPMoney();showToast('✅ Тўлов қайд этилди!');
+}
+
+async function delCPPay(id){
+  showConf('Тўловни ўчириш','Ушбу тўловни ўчириш истайсизми?',async()=>{
+    await sb('DELETE','brigade_client_payments',`id=eq.${id}`);
+    await syncAll();renderCPPayList();renderCPMoney();
+  });
+}
+
+function renderDash(){
+  const month=tMonth();const[yr,mo]=month.split('-');const days=dimM(month);
+  let mE=0,mH=0;
+  W.forEach(w=>{for(let d=1;d<=days;d++){const date=`${yr}-${mo}-${d.toString().padStart(2,'0')}`;const ent=D[date+'_'+w.id];if(ent&&ent.status!=='kelmadi'){mE+=(ent.pay||0);mH+=(ent.hours||0);}}});
+  const today=tDay();const keldi=W.filter(w=>{const e=D[today+'_'+w.id];return e&&e.status==='keldi';}).length;
+  const activeC=C.filter(c=>c.status==='progress').length;
+  const debt=C.reduce((s,c)=>{const paid=CPAY.filter(p=>p.client_id===c.id).reduce((a,p)=>a+p.amount,0);return s+Math.max(0,(c.total||0)-paid);},0);
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="sc"><div class="v">${W.length}</div><div class="l">Ишчилар</div></div>
+    <div class="sc"><div class="v">${keldi}/${W.length}</div><div class="l">Бугун келди</div></div>
+    <div class="sc"><div class="v">${mH.toFixed(0)}</div><div class="l">Бу ой соат</div></div>
+    <div class="sc"><div class="v">${fmt(mE)}</div><div class="l">Бу ой маош</div></div>
+    <div class="sc"><div class="v">${activeC}</div><div class="l">Ишдаги</div></div>
+    <div class="sc"><div class="v">${fmt(debt)}</div><div class="l">Клиент қарзи</div></div>`;
+  renderTodayGrid();
+  const recent=Object.values(D).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,6);
+  const el=document.getElementById('recent-list');
+  el.innerHTML=recent.length?recent.map(ent=>{
+    const w=W.find(x=>x.id===ent.worker_id);const wn=w?w.name:'?';
+    const cn=ent.client_id?(C.find(x=>x.id===ent.client_id)||{name:'?'}).name:'';
+    const icon=ent.status==='keldi'?'✅':ent.status==='kelmadi'?'❌':'⚡';
+    return `<div class="li"><div class="ld">${(ent.date||'').slice(5).replace('-','/')}</div>
+      <div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:.83rem;">${icon} ${wn}${cn?' · <span style="color:var(--blu);font-size:.67rem;">'+cn+'</span>':''}</div>
+      <div style="font-size:.67rem;color:var(--mut);">${ent.start_time&&ent.end_time?ent.start_time+'–'+ent.end_time:''} ${ent.hours?(ent.hours.toFixed(1)+' соат'):''}</div></div>
+      <div style="font-family:\'Oswald\',sans-serif;color:var(--grn);font-size:.85rem;">${fmt(ent.pay)}</div>
+    </div>`;
+  }).join(''):'<div class="emp"><div class="ic">📋</div>Ҳали ёзув йўқ</div>';
+}
+
+function navBtns(lat,lon,link){
+  if(!lat&&!lon&&!link)return '';
+  const yUrl=lat&&lon?`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`:link||'';
+  const yMap=lat&&lon?`https://yandex.uz/maps/?rtext=~${lat},${lon}&rtt=auto`:link||'';
+  const gUrl=lat&&lon?`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`:link||'';
+  return `<div class="nav-btns">
+    ${yUrl?`<a href="${yUrl}" class="nav-btn nby" onclick="openYandex(event,'${yMap}')">🧭 Яндекс</a>`:''}
+    ${gUrl?`<a href="${gUrl}" target="_blank" class="nav-btn nbg">📍 Google</a>`:''}
+  </div>`;
+}
+function openYandex(e,fb){e.preventDefault();const u=e.currentTarget.href;const t=Date.now();window.location=u;setTimeout(()=>{if(Date.now()-t<1500)window.open(fb,'_blank');},1000);}
+
+function renderStat(){
+  const period=document.getElementById('st-per').value;
+  const month=document.getElementById('st-mon').value||tMonth();
+  const davEnt=Object.values(D).filter(e=>period==='month'?e.date&&e.date.startsWith(month):true);
+  const filterCPay=(c)=>CPAY.filter(p=>p.client_id===c.id&&(period==='all'||p.date&&p.date.startsWith(month)));
+  const wCost=davEnt.filter(e=>e.status!=='kelmadi').reduce((s,e)=>s+(e.pay||0),0);
+  const tP=davEnt.reduce((s,e)=>s+(e.penalty||0),0);
+  const tD=davEnt.filter(e=>e.status==='keldi'||e.status==='yarim').length;
+  const tH=davEnt.reduce((s,e)=>s+(e.hours||0),0);
+  let income=0,contractSum=0,debt=0;
+  C.forEach(c=>{contractSum+=(c.total||0);const p=filterCPay(c).reduce((s,x)=>s+x.amount,0);income+=p;debt+=Math.max(0,(c.total||0)-CPAY.filter(x=>x.client_id===c.id).reduce((s,x)=>s+x.amount,0));});
+  const foyda=income-wCost;
+  document.getElementById('st-top').innerHTML=`
+    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(income)}</div><div class="l">💰 Тушган пул</div></div>
+    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(wCost)}</div><div class="l">👷 Маош</div></div>
+    <div class="sc"><div class="v" style="font-size:1rem;color:${foyda>=0?'var(--grn)':'var(--red)'};">${fmt(Math.abs(foyda))}</div><div class="l">${foyda>=0?'📈 Фойда':'📉 Зарар'}</div></div>
+    <div class="sc"><div class="v" style="font-size:1rem;">${fmt(debt)}</div><div class="l">⏳ Қарз</div></div>
+    <div class="sc"><div class="v">${tD}</div><div class="l">📅 Иш кун</div></div>
+    <div class="sc"><div class="v">${tH.toFixed(0)}</div><div class="l">⏱ Соат</div></div>`;
+  const wPct=income>0?Math.min(100,(wCost/income*100).toFixed(1)):0;
+  const fPct=income>0?Math.max(0,(foyda/income*100).toFixed(1)):0;
+  document.getElementById('st-fin').innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:13px;margin-bottom:10px;">
+    <div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--mut);margin-bottom:3px;"><span>Даромад / Харажат</span><span>${fmt(income)} сўм</span></div>
+    <div class="bar"><div class="bar-fill" style="width:${wPct}%;background:var(--red);"></div></div>
+    <div style="display:flex;gap:10px;margin-top:5px;font-size:.68rem;"><span style="color:var(--grn);">■ Фойда: ${fmt(Math.max(0,foyda))} (${fPct}%)</span><span style="color:var(--red);">■ Маош: ${fmt(wCost)} (${wPct}%)</span></div></div>
+    ${[['💰 Тушган пул',fmt(income)+' сўм','var(--grn)'],['📋 Шартнома',fmt(contractSum)+' сўм','var(--txt)'],['⏳ Клиент қарзи',fmt(debt)+' сўм','var(--red)'],['👷 Маош харажати',fmt(wCost)+' сўм','var(--acc)'],['⚡ Жарималар',fmt(tP)+' сўм','var(--mut)'],[foyda>=0?'📈 Соф фойда':'📉 Зарар',fmt(Math.abs(foyda))+' сўм',foyda>=0?'var(--grn)':'var(--red)']].map(([l,v,clr])=>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor);"><span style="font-size:.78rem;color:var(--mut);">${l}</span><span style="font-size:.8rem;font-weight:700;color:${clr};">${v}</span></div>`).join('')}
+  </div>`;
+  document.getElementById('st-proj').innerHTML=C.map(c=>{
+    const paid=CPAY.filter(p=>p.client_id===c.id).reduce((s,p)=>s+p.amount,0);
+    const fP=filterCPay(c).reduce((s,p)=>s+p.amount,0);
+    const cD=Math.max(0,(c.total||0)-paid);
+    const cW=davEnt.filter(e=>e.client_id===c.id&&e.status!=='kelmadi').reduce((s,e)=>s+(e.pay||0),0);
+    const pr=fP-cW;const pct=c.total>0?Math.min(100,Math.round(paid/c.total*100)):0;
+    return `<div style="background:var(--sur);border:1px solid var(--bor);border-radius:11px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+        <div class="av b" style="width:30px;height:30px;font-size:.75rem;">${ini(c.name)}</div>
+        <div style="flex:1;"><div style="font-weight:700;font-size:.87rem;">${c.name}</div></div>
+        <span class="sbg ${SCLS[c.status]||'sn'}">${SLBL[c.status]||'Янги'}</span>
+      </div>
+      <div style="margin-bottom:7px;"><div class="bar"><div class="bar-fill" style="width:${pct}%;background:${pct>=100?'var(--grn)':'var(--acc)'};"></div></div></div>
+      <div class="mgrid">
+        <div class="mc"><div class="v" style="font-size:.8rem;">${fmt(c.total)}</div><div class="l">Шартнома</div></div>
+        <div class="mc"><div class="v" style="font-size:.8rem;color:var(--grn);">${fmt(paid)}</div><div class="l">Тўланди</div></div>
+        <div class="mc"><div class="v" style="font-size:.8rem;color:${cD>0?'var(--red)':'var(--grn)'};">${fmt(cD)}</div><div class="l">${cD>0?'Қарз':'Тўлиқ'}</div></div>
+        <div class="mc"><div class="v" style="font-size:.8rem;color:var(--acc);">${fmt(cW)}</div><div class="l">Маош</div></div>
+        <div class="mc" style="grid-column:span 2;background:rgba(${pr>=0?'46,204,113':'231,76,60'},.1);">
+          <div class="v" style="color:${pr>=0?'var(--grn)':'var(--red)'};">${pr>=0?'+':''}${fmt(pr)}</div><div class="l">${pr>=0?'Фойда':'Зарар'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')||'<div class="emp"><div class="ic">🏠</div>Клиентлар йўқ</div>';
+  document.getElementById('st-wrk').innerHTML=W.map(w=>{
+    const wE=davEnt.filter(e=>e.worker_id===w.id&&e.status!=='kelmadi');
+    const wD=wE.filter(e=>e.status==='keldi'||e.status==='yarim').length;
+    const wH=wE.reduce((s,e)=>s+(e.hours||0),0);const wP=wE.reduce((s,e)=>s+(e.pay||0),0);
+    const wAdv=ADV.filter(a=>a.worker_id===w.id).reduce((s,a)=>s+a.amount,0);
+    if(wD===0&&wP===0)return '';
+    return `<div style="background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:11px 12px;margin-bottom:8px;display:flex;align-items:center;gap:9px;">
+      <div class="av" style="width:32px;height:32px;font-size:.8rem;">${ini(w.name)}</div>
+      <div style="flex:1;"><div style="font-weight:700;font-size:.87rem;">${w.name}</div>
+        <div style="font-size:.68rem;color:var(--mut);">${wD} кун · ${wH.toFixed(1)} соат</div></div>
+      <div style="text-align:right;"><div style="font-family:'Oswald',sans-serif;font-size:.95rem;color:var(--grn);">${fmt(wP)}</div>
+        <div style="font-size:.65rem;color:var(--mut);">аванс: ${fmt(wAdv)}</div></div>
+    </div>`;
+  }).filter(Boolean).join('')||'<div class="emp"><div class="ic">👷</div>Бу даврда иш йўқ</div>';
+}
+</script>
+</body>
+</html>
