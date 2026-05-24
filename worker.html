@@ -114,13 +114,21 @@ async function api(method,table,query,body){
       headers:{
         'apikey':SK,'Authorization':'Bearer '+SK,
         'Content-Type':'application/json',
-        'Prefer':method==='POST'?'return=representation':''
+        'Prefer':method==='POST'?'return=representation':method==='PATCH'?'return=representation':''
       },
       body:body?JSON.stringify(body):undefined
     });
+    if(!r.ok){
+      const err=await r.text();
+      console.error('API error:',r.status,err);
+      return null;
+    }
     const t=await r.text();
-    return t?JSON.parse(t):null;
-  }catch(e){return null;}
+    return t?JSON.parse(t):[];
+  }catch(e){
+    console.error('Fetch error:',e);
+    return null;
+  }
 }
 
 function fmt(n){return Math.round(Number(n||0)).toLocaleString('uz-UZ');}
@@ -261,12 +269,15 @@ function renderStatus(){
 
 async function checkIn(){
   const t=nowTime();const td=today();
-  const body={id:genId(),worker_id:worker.id,date:td,start_time:t,end_time:null,
+  const body={id:genId(),worker_id:worker.id,date:td,start_time:t,end_time:'',
     status:'keldi',pay:0,hours:0,penalty:0,rate:worker.rate||0,
     stavka_type:worker.stavka_type||'daily',from_worker:true,client_id:''};
   const res=await api('POST','brigade_davomat','',body);
   if(res&&res.length){todayEnt=res[0];renderStatus();await loadHistory();showToast('✅ Kelish vaqti saqlandi: '+t);}
-  else showToast('❌ Xatolik! Internetni tekshiring.');
+  else{
+    // Try without id conflict
+    showToast('❌ Xatolik! Qayta urinib ko\'ring.');
+  }
 }
 
 async function checkOut(){
