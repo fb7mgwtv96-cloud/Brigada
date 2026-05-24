@@ -1288,15 +1288,23 @@ function renderDash(){
   W.forEach(w=>{for(let d=1;d<=days;d++){const date=`${yr}-${mo}-${d.toString().padStart(2,'0')}`;const ent=D[date+'_'+w.id];if(ent&&ent.status!=='kelmadi'){mE+=(ent.pay||0);mH+=(ent.hours||0);}}});
   const today=tDay();const keldi=W.filter(w=>{const e=D[today+'_'+w.id];return e&&e.status==='keldi';}).length;
   const activeC=C.filter(c=>c.status==='progress').length;
-  const debt=C.reduce((s,c)=>{const paid=CPAY.filter(p=>p.client_id===c.id).reduce((a,p)=>a+p.amount,0);return s+Math.max(0,(c.total||0)-paid);},0);
+  const cliDebt=C.reduce((s,c)=>{const paid=CPAY.filter(p=>p.client_id===c.id).reduce((a,p)=>a+p.amount,0);return s+Math.max(0,(c.total||0)-paid);},0);
+  // Bu oy avanslar
+  const monthAdv=ADV.filter(a=>a.date&&a.date.startsWith(month)).reduce((s,a)=>s+a.amount,0);
+  // Jami avanslar (hisob uchun)
+  const totalAdv=ADV.reduce((s,a)=>s+a.amount,0);
+  // Qoldiq = bu oy maosh - jami avanslari
+  const qoldiq=Math.max(0,mE-totalAdv);
+
   document.getElementById('dash-stats').innerHTML=`
     <div class="sc"><div class="v">${W.length}</div><div class="l">Ишчилар</div></div>
     <div class="sc"><div class="v">${keldi}/${W.length}</div><div class="l">Бугун келди</div></div>
     <div class="sc"><div class="v">${mH.toFixed(0)}</div><div class="l">Бу ой соат</div></div>
-    <div class="sc"><div class="v">${fmt(mE)}</div><div class="l">Бу ой маош</div></div>
-    <div class="sc"><div class="v">${activeC}</div><div class="l">Ишдаги</div></div>
-    <div class="sc"><div class="v">${fmt(debt)}</div><div class="l">Клиент қарзи</div></div>`;
-  renderTodayGrid();
+    <div class="sc"><div class="v" style="color:var(--grn);">${fmt(mE)}</div><div class="l">Бу ой маош</div></div>
+    <div class="sc"><div class="v" style="color:var(--acc);">${fmt(monthAdv)}</div><div class="l">Бу ой аванс</div></div>
+    <div class="sc"><div class="v" style="color:${qoldiq>0?'var(--grn)':'var(--mut)'};">${fmt(qoldiq)}</div><div class="l">Қолдиқ</div></div>
+    <div class="sc"><div class="v">${activeC}</div><div class="l">Ишдаги объект</div></div>
+    <div class="sc"><div class="v" style="color:var(--red);">${fmt(cliDebt)}</div><div class="l">Клиент қарзи</div></div>`;
   const recent=Object.values(D).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,6);
   const el=document.getElementById('recent-list');
   el.innerHTML=recent.length?recent.map(ent=>{
